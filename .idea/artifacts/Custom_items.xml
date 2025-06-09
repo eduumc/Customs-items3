@@ -1,0 +1,6 @@
+<component name="ArtifactManager">
+  <artifact type="jar" build-on-make="true" name="Custom-items">
+    <output-path>$USER_HOME$/Downloads</output-path>
+    <root id="archive" name="Custom-items.jar" />
+  </artifact>
+</component>

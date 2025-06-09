@@ -1,0 +1,19 @@
+###########################################################################################
+# Si necesitas ayuda con algo del plugin o reportar algun bug, por favor mandame dm a mi discord
+# eduardo_mc.
+# Customs items by generate. V:1.0.0
+# This plugins be compatibly with RGB codes and color code of minecraft
+items:
+  example:
+    material: DIAMOND_SWORD
+    name: "&b&lEspada Mágica"
+    right-click:
+      commands:
+        - "say %player% ha usado su espada mágica (clic derecho)"
+      messages:
+        - "&a¡Activaste el poder de la espada mágica!"
+    attack:
+      commands:
+        - "say %player% ha golpeado con su espada mágica"
+      messages:
+        - "&c¡Usaste la espada mágica para atacar!"
