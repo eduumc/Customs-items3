@@ -1,6 +1,30 @@
 name: Customs-items
 main: edu.customs.items.ItemActionsPlugin
-version: 1.0
+version: 1.0.3
+description: El mejor plugin para crear items ejecutables & customs.
 api-version: 1.13
-author: Edumc
-commands: {}
+author: EduMC_
+commands:
+  customitems:
+    description: Comandos del plugin
+    usage: /customitems <give|reload|list|help>
+    aliases: [ci]
+    permission: customitems.use
+    permission-message: §f[§bcustomitems§f] §cNo tienes permiso para usar este comando.
+
+permissions:
+  customitems.use:
+    description: Permite usar el comando /customitems
+    default: true
+
+  customitems.reload:
+    description: Permite usar /customitems reload
+    default: op
+
+  customitems.give:
+    description: Permite usar /customitems give
+    default: op
+
+  customitems.list:
+    description: Permite usar /customitems list
+    default: true

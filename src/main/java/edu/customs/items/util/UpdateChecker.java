@@ -1,6 +1,7 @@
 package edu.customs.items.util;
 
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.io.BufferedReader;
@@ -33,11 +34,23 @@ public class UpdateChecker {
                 String currentVersion = plugin.getDescription().getVersion();
 
                 if (!latestVersion.equalsIgnoreCase(currentVersion)) {
-                    Bukkit.getConsoleSender().sendMessage("§c[CustomItems] Hay una nueva versión disponible: §e" + latestVersion + " §c(Tienes: §e" + currentVersion + "§c)");
+                    String message = "§a[CustomItems]§c Hay una nueva versión disponible: §e" + latestVersion + " §c(Tienes: §e" + currentVersion + "§c)";
+
+                    // Mensaje a la consola
+                    Bukkit.getConsoleSender().sendMessage(message);
+
+                    // Enviar mensaje a todos los operadores online
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        for (Player player : Bukkit.getOnlinePlayers()) {
+                            if (player.isOp()) {
+                                player.sendMessage(message);
+                            }
+                        }
+                    });
                 }
 
             } catch (Exception e) {
-                Bukkit.getConsoleSender().sendMessage("§c[CustomItems] No se pudo verificar si hay una nueva versión.");
+                Bukkit.getConsoleSender().sendMessage("§a[CustomItems] §cNo se pudo verificar si hay una nueva versión.");
             }
         });
     }

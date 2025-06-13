@@ -1,19 +1,83 @@
 ###########################################################################################
-# Si necesitas ayuda con algo del plugin o reportar algun bug, por favor mandame dm a mi discord
-# eduardo_mc.
-# Customs items by generate. V:1.0.0
-# This plugins be compatibly with RGB codes and color code of minecraft
+# Plugin: CustomItems by EduMC_
+# Versión: 1.0.0
+# Soporte: DM en Discord -> eduardo_mc
+#
+# Este plugin soporta:
+#  - Códigos de colores (&, §) y hexadecimales (#RRGGBB).
+#  - Sistema de usos (%uses% en lore).
+#  - Reducción por uso (`reduce-amount`).
+#  - Soporte para WorldGuard: `region-blacklist`, `region-block`.
+#
+# ⚠️ ¡Gracias por usar mi plugin!
+###########################################################################################
+
+# Localización de mensajes. Busca un archivo en /locale/
+Locale: En-us
+
+# Prefijo para todos los mensajes
+Prefix: "&a[CustomItems] "
+
+# Bloquea el uso de ítems en ciertas regiones de WorldGuard
+region-blacklist:
+  - spawn
+  - lobby
+  - safezone
+
+# Lista de ítems o nombres (keys) bloqueados en todas las regiones del `region-blacklist`
+item-blacklist:
+  - BOW
+  - TNT
+
+# Si es true, solo los ítems listados arriba se bloquean en las regiones.
+# Si es false, cualquier ítem está bloqueado en las regiones especificadas.
+block-only-listed-items: true
+
+###########################################################################################
+# CONFIGURACIÓN DE ÍTEMS PERSONALIZADOS
+###########################################################################################
+
 items:
   example:
     material: DIAMOND_SWORD
     name: "&b&lEspada Mágica"
+    lore:
+      - "&7Usos restantes: %uses%"
+      - "&e¡Disfruta tu espada!"
     right-click:
+      cooldown: 5 # en segundos (opcional si implementas cooldown)
       commands:
         - "say %player% ha usado su espada mágica (clic derecho)"
       messages:
         - "&a¡Activaste el poder de la espada mágica!"
-    attack:
+      reduce-amount: 1 # ❗ Asegúrate de escribir correctamente "reduce-amount"
+      uses: 4
+    region-block:
+      - zona_prohibida
+  golden-apple-custom:
+    material: GOLDEN_APPLE
+    name: "&6Manzana Suprema"
+    lore:
+      - "&e¡Una manzana bendita!"
+    consume:
       commands:
-        - "say %player% ha golpeado con su espada mágica"
+        - "effect give %player% minecraft:regeneration 10 2"
+        - "say %player% ha comido una Manzana Suprema"
       messages:
-        - "&c¡Usaste la espada mágica para atacar!"
+        - "&aHas consumido una &6Manzana Suprema&a y obtenido regeneración."
+      reduce-amount: 1
+    region-block:
+      - zona_sagrada
+  healing-potion:
+    material: POTION
+    name: "&dPoción de Curación"
+    lore:
+      - "&7¡Te restaura salud al consumirla!"
+    consume:
+      commands:
+        - "effect give %player% minecraft:instant_health 1"
+      messages:
+        - "&a¡Te curaste con la poción!"
+      reduce-amount: 1
+    region-block:
+      - pvp_zone
