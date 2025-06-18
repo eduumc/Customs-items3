@@ -1,7 +1,8 @@
 name: Customs-items
 main: edu.customs.items.ItemActionsPlugin
-version: 1.0.3
+version: 1.0.6
 description: El mejor plugin para crear items ejecutables & customs.
+website: https://discord.gg/y5xgyY4JpH
 api-version: 1.13
 author: EduMC_
 commands:

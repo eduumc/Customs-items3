@@ -13,7 +13,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
-import java.util.*;
+import java.util.List;
 
 public class AttackListener implements Listener {
 
@@ -25,8 +25,7 @@ public class AttackListener implements Listener {
 
     @EventHandler
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
-        if (!(event.getDamager() instanceof Player)) return;
-        Player player = (Player) event.getDamager();
+        if (!(event.getDamager() instanceof Player player)) return;
         Entity target = event.getEntity();
 
         ItemStack item = VersionUtils.getItemInHand(player);
@@ -35,31 +34,25 @@ public class AttackListener implements Listener {
         ConfigurationSection itemsSection = plugin.getConfig().getConfigurationSection("items");
         if (itemsSection == null) return;
 
-        List<String> globalRegionBlacklist = plugin.getConfig().getStringList("region-blacklist");
-        List<String> globalItemBlacklist = plugin.getConfig().getStringList("item-blacklist");
-
         for (String key : itemsSection.getKeys(false)) {
             String basePath = "items." + key;
-
             String material = plugin.getConfig().getString(basePath + ".material");
-            String nameConfig = plugin.getConfig().getString(basePath + ".name");
-            if (material == null || nameConfig == null) continue;
+            String configName = plugin.getConfig().getString(basePath + ".name");
+
+            if (material == null || configName == null) continue;
 
             if (!item.getType().name().equalsIgnoreCase(material)) continue;
 
             ItemMeta meta = item.getItemMeta();
             if (meta == null || !meta.hasDisplayName()) continue;
 
-            String itemName = meta.getDisplayName();
+            if (!ColorUtil.matchColorName(configName, meta.getDisplayName())) continue;
 
-            // ✅ Comparación segura usando matchColorName de ColorUtil
-            if (!ColorUtil.matchColorName(nameConfig, itemName)) continue;
-
-            // ⛔ Verificación de regiones
+            // Check WorldGuard regions or blacklists
             List<String> itemRegionBlock = plugin.getConfig().getStringList(basePath + ".region-block");
-
             boolean canUse = WGUtils.canUseItem(player, player.getLocation(),
-                    globalRegionBlacklist, globalItemBlacklist,
+                    plugin.getGlobalRegionBlacklist().stream().toList(),
+                    plugin.getItemBlacklist().stream().toList(),
                     key, material, itemRegionBlock);
 
             if (!canUse) {
@@ -68,8 +61,8 @@ public class AttackListener implements Listener {
                 return;
             }
 
-            // ⏳ Manejo del cooldown
-            long cooldown = plugin.getConfig().getLong(basePath + ".attack.cooldown", 0);
+            // Cooldown
+            long cooldown = plugin.getConfig().getLong(basePath + ".attack.cooldown", 0L);
             if (CooldownManager.hasCooldown(player, key)) {
                 long remaining = CooldownManager.getRemaining(player, key);
                 String prefix = plugin.getConfig().getString("Prefix", "&7[Items] ");
@@ -78,23 +71,21 @@ public class AttackListener implements Listener {
                 return;
             }
 
-            // ✅ Ejecutar comandos y mensajes
+            // Ejecutar acciones
             List<String> commands = plugin.getConfig().getStringList(basePath + ".attack.commands");
             List<String> messages = plugin.getConfig().getStringList(basePath + ".attack.messages");
 
-            commands = replaceVariables(commands, player.getName(), target.getName());
-            messages = replaceVariables(messages, player.getName(), target.getName());
+            ActionExecutor.run(plugin, player, target,
+                    replaceVars(commands, player.getName(), target.getName()),
+                    replaceVars(messages, player.getName(), target.getName()));
 
-            ActionExecutor.run(plugin, player, target, commands, messages);
-
-            if (cooldown > 0) {
+            if (cooldown > 0L) {
                 CooldownManager.setCooldown(player, key, cooldown);
             }
 
-            // 🔁 Manejo de usos y reducción de cantidad
+            // Uso o reducción de cantidad
             int maxUses = plugin.getConfig().getInt(basePath + ".attack.uses", 0);
             int reduceAmount = plugin.getConfig().getInt(basePath + ".attack.reduce-amount", 0);
-
             NamespacedKey usesKey = new NamespacedKey(plugin, "custom_uses");
 
             if (maxUses > 0) {
@@ -119,18 +110,13 @@ public class AttackListener implements Listener {
                 }
             }
 
-            break; // Ítem procesado
+            break; // Salimos del bucle porque ya se encontró el ítem
         }
     }
 
-    private List<String> replaceVariables(List<String> list, String executor, String target) {
-        if (list == null) return Collections.emptyList();
-        List<String> replaced = new ArrayList<>();
-        for (String line : list) {
-            line = line.replace("%executor%", executor)
-                    .replace("%target%", target);
-            replaced.add(ColorUtil.format(line));
-        }
-        return replaced;
+    private List<String> replaceVars(List<String> list, String executor, String target) {
+        return list.stream()
+                .map(str -> str.replace("%executor%", executor).replace("%target%", target))
+                .toList();
     }
 }

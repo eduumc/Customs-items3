@@ -1,6 +1,6 @@
 ###########################################################################################
 # Plugin: CustomItems by EduMC_
-# Versión: 1.0.0
+# Versión: 1.0.4
 # Soporte: DM en Discord -> eduardo_mc
 #
 # Este plugin soporta:
@@ -8,15 +8,15 @@
 #  - Sistema de usos (%uses% en lore).
 #  - Reducción por uso (`reduce-amount`).
 #  - Soporte para WorldGuard: `region-blacklist`, `region-block`.
+#  - Puedes usar %executor% (El jugador que ejecuto, el clicl ataque, o que consumio)
+#  - %target% (solo disponble para cuando atacas y es el que atacas)
 #
 # ⚠️ ¡Gracias por usar mi plugin!
 ###########################################################################################
-
 # Localización de mensajes. Busca un archivo en /locale/
 Locale: En-us
-
 # Prefijo para todos los mensajes
-Prefix: "&a[CustomItems] "
+Prefix: "&5[CustomItems] "
 
 # Bloquea el uso de ítems en ciertas regiones de WorldGuard
 region-blacklist:
@@ -38,20 +38,19 @@ block-only-listed-items: true
 ###########################################################################################
 
 items:
-  example:
+  espada_prueba:
     material: DIAMOND_SWORD
-    name: "&b&lEspada Mágica"
+    name: '&#FF00FF&lEspada Cool'
     lore:
-      - "&7Usos restantes: %uses%"
-      - "&e¡Disfruta tu espada!"
-    right-click:
-      cooldown: 5 # en segundos (opcional si implementas cooldown)
+      - '&7Usos restantes: %uses%'
+    attack:
+      uses: 5
+      cooldown: 3
+      reduce-amount: 0
       commands:
-        - "say %player% ha usado su espada mágica (clic derecho)"
+        - 'say %executor% ha usado la espada en %target%'
       messages:
-        - "&a¡Activaste el poder de la espada mágica!"
-      reduce-amount: 1 # ❗ Asegúrate de escribir correctamente "reduce-amount"
-      uses: 4
+        - '&a¡Has golpeado a %target% con tu espada mágica!'
     region-block:
       - zona_prohibida
   golden-apple-custom:
@@ -61,8 +60,8 @@ items:
       - "&e¡Una manzana bendita!"
     consume:
       commands:
-        - "effect give %player% minecraft:regeneration 10 2"
-        - "say %player% ha comido una Manzana Suprema"
+        - "effect give %executor% minecraft:regeneration 10 2"
+        - "say %executor% ha comido una Manzana Suprema"
       messages:
         - "&aHas consumido una &6Manzana Suprema&a y obtenido regeneración."
       reduce-amount: 1
@@ -75,21 +74,9 @@ items:
       - "&7¡Te restaura salud al consumirla!"
     consume:
       commands:
-        - "effect give %player% minecraft:instant_health 1"
+        - "effect give %executor% minecraft:instant_health 1"
       messages:
         - "&a¡Te curaste con la poción!"
       reduce-amount: 1
-  espada_legendaria:
-    material: DIAMOND_SWORD
-    reduce-ammount: 1
-    cooldown: 5
-    Expiration_time:
-      duration: 5m
-      slots:
-        - hand
-        - offhand
-      triggers:
-        - onAttack
-        - onHold
     region-block:
       - pvp_zone

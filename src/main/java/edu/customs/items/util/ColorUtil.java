@@ -1,120 +1,88 @@
 package edu.customs.items.util;
 
-import net.md_5.bungee.api.ChatColor;
-import net.md_5.bungee.api.chat.BaseComponent;
-import net.md_5.bungee.api.chat.ComponentBuilder;
-import net.md_5.bungee.api.chat.TextComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class ColorUtil {
 
-    // Soporte para #rrggbb y &#rrggbb
-    private static final Pattern HEX_PATTERN = Pattern.compile("&#([a-fA-F0-9]{6})|#([a-fA-F0-9]{6})");
-
-    // Soporte para &x&F&F&0&0&0&0
-    private static final Pattern SPIGOT_HEX_PATTERN = Pattern.compile("&x((&[A-Fa-f0-9]){6})");
-
-    private static final boolean SUPPORTS_HEX = isHexSupported();
+    private static final Pattern HEX_PATTERN = Pattern.compile("&#[a-fA-F0-9]{6}");
     private static final MiniMessage MINI = MiniMessage.miniMessage();
 
     /**
-     * Aplica formato de color:
-     * - Legacy (&a, &b)
-     * - Hex (&x&F&F&0&0&0&0)
-     * - Hex (#FF0000 y &#FF0000)
+     * Traduce una cadena con soporte para:
+     * - Códigos hexadecimales (&#rrggbb)
+     * - Códigos clásicos de color (&a, &b, etc.)
      */
     public static String format(String message) {
-        if (message == null) return "";
-
-        // Traducir formato &x&F&F&0&0&0&0 → #FF0000
-        message = translateSpigotHex(message);
-
-        // Aplicar colores hex si es compatible
-        if (SUPPORTS_HEX) {
-            Matcher matcher = HEX_PATTERN.matcher(message);
-            while (matcher.find()) {
-                String hexCode = matcher.group();
-                try {
-                    ChatColor color = ChatColor.of(hexCode.replace("&", ""));
-                    message = message.replace(hexCode, color.toString());
-                } catch (IllegalArgumentException ignored) {}
-            }
+        if (message == null || message.isEmpty()) return "";
+        if (message.contains("&#") || message.contains("#")) {
+            message = translateSpigotHex(message);
         }
-
-        // Aplicar colores legacy (&a, &b, etc.)
         return ChatColor.translateAlternateColorCodes('&', message);
     }
 
     /**
-     * Traduce formato &x&F&F&0&0&0&0 a #FF0000
+     * Convierte códigos hexadecimales tipo &#rrggbb a formato §x§r§r§g§g§b§b.
      */
-    private static String translateSpigotHex(String message) {
-        Matcher matcher = SPIGOT_HEX_PATTERN.matcher(message);
+    public static String translateSpigotHex(String message) {
+        Matcher matcher = HEX_PATTERN.matcher(message);
+        StringBuilder builder = new StringBuilder();
+
+        int lastIndex = 0;
         while (matcher.find()) {
-            String group = matcher.group(1).replace("&", "");
-            if (group.length() == 6) {
-                String hex = "#" + group;
-                message = message.replace(matcher.group(), hex);
+            builder.append(message, lastIndex, matcher.start());
+            String hexCode = matcher.group().substring(2); // Remove '&#'
+            builder.append(ChatColor.COLOR_CHAR).append('x');
+            for (char c : hexCode.toCharArray()) {
+                builder.append(ChatColor.COLOR_CHAR).append(c);
             }
+            lastIndex = matcher.end();
         }
-        return message;
+
+        builder.append(message.substring(lastIndex));
+        return builder.toString();
     }
 
     /**
-     * Usa MiniMessage si se detecta <...>, si no, aplica legacy + hex
+     * Compara dos nombres con colores formateados y sin colores.
      */
-    public static BaseComponent[] formatLegacyOrMini(String input) {
-        if (input == null) return new BaseComponent[0];
-
-        if (input.contains("<") && input.contains(">")) {
-            Component component = MINI.deserialize(input);
-            String legacy = LegacyComponentSerializer.legacySection().serialize(component);
-            return new ComponentBuilder(legacy).create();
+    public static boolean matchColorName(String configName, String itemName) {
+        if (configName != null && itemName != null) {
+            String formattedConfigName = ChatColor.stripColor(format(configName));
+            String strippedItemName = ChatColor.stripColor(itemName);
+            return formattedConfigName.equalsIgnoreCase(strippedItemName);
         } else {
-            return new ComponentBuilder(format(input)).create();
-        }
-    }
-
-    /**
-     * Devuelve un TextComponent plano con formato legacy + hex
-     */
-    public static TextComponent simple(String input) {
-        return new TextComponent(format(input));
-    }
-
-    /**
-     * Detecta si el servidor soporta colores hexadecimales (1.16+)
-     */
-    private static boolean isHexSupported() {
-        String version = getServerVersion();
-        try {
-            int major = Integer.parseInt(version.split("\\.")[1]);
-            return major >= 16;
-        } catch (Exception e) {
             return false;
         }
     }
 
-    private static String getServerVersion() {
-        String bukkitVersion = Bukkit.getBukkitVersion(); // Ej: "1.18.2-R0.1-SNAPSHOT"
-        return bukkitVersion.split("-")[0]; // Resultado: "1.18.2"
-    }
-
     /**
-     * Compara dos nombres ignorando colores (hex + legacy + MiniMessage)
+     * Convierte un string a Adventure Component.
+     * Si contiene <>, usa MiniMessage. Si contiene colores, los convierte.
      */
-    public static boolean matchColorName(String configName, String itemName) {
-        if (configName == null || itemName == null) return false;
+    public static Component toComponent(String message) {
+        if (message == null || message.isEmpty()) {
+            return Component.empty();
+        }
 
-        String formattedConfigName = ChatColor.stripColor(format(configName));
-        String strippedItemName = ChatColor.stripColor(itemName);
+        // Si contiene MiniMessage
+        if (message.contains("<") && message.contains(">")) {
+            return MINI.deserialize(message);
+        }
 
-        return formattedConfigName.equalsIgnoreCase(strippedItemName);
+        // Si contiene RGB, convertir
+        if (message.contains("&#") || message.contains("#")) {
+            message = translateSpigotHex(message);
+        }
+
+        // Colores clásicos
+        message = ChatColor.translateAlternateColorCodes('&', message);
+
+        return LegacyComponentSerializer.legacySection().deserialize(message);
     }
 }

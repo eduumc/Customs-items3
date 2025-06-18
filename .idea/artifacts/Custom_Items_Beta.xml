@@ -1,8 +1,0 @@
-<component name="ArtifactManager">
-  <artifact type="jar" name="Custom-Items-Beta">
-    <output-path>$USER_HOME$/OneDrive/Documentos/Plugins/artifacts/Custom_Items_Beta</output-path>
-    <root id="archive" name="Customs-items.jar">
-      <element id="module-output" name="Customs-items" />
-    </root>
-  </artifact>
-</component>

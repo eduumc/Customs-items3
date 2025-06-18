@@ -3,11 +3,11 @@ package edu.customs.items;
 import edu.customs.items.listeners.AttackListener;
 import edu.customs.items.listeners.ConsumibleListeners;
 import edu.customs.items.listeners.RightClickListener;
+import edu.customs.items.us.com.java.edu.nolook.any.A1;
 import edu.customs.items.util.ColorUtil;
 import edu.customs.items.util.LangManager;
 import edu.customs.items.util.UpdateChecker;
-import edu.customs.items.us.com.java.edu.nolook.any.A1;
-
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -19,19 +19,18 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.util.*;
 
 public class ItemActionsPlugin extends JavaPlugin {
-
     private static ItemActionsPlugin instance;
     private String licenseId;
-
     private final Map<String, ItemStack> customItems = new HashMap<>();
     private final Map<String, List<String>> customItemRegionBlocks = new HashMap<>();
     private final Set<String> globalRegionBlacklist = new HashSet<>();
     private final Set<String> itemBlacklist = new HashSet<>();
-
     private boolean blockOnlyListedItems = true;
 
     public static ItemActionsPlugin getInstance() {
@@ -41,13 +40,10 @@ public class ItemActionsPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
-
-        // 1) Cargar configuración base
         saveDefaultConfig();
         FileConfiguration cfg = getConfig();
-        this.blockOnlyListedItems = cfg.getBoolean("block-only-listed-items", true);
+        blockOnlyListedItems = cfg.getBoolean("block-only-listed-items", true);
 
-        // 2) Generar o cargar licenseId externo
         try {
             licenseId = loadOrCreateLicenseFile();
         } catch (IOException e) {
@@ -56,31 +52,17 @@ public class ItemActionsPlugin extends JavaPlugin {
             return;
         }
 
-        // 3) Verificar licencia; sólo tras éxito inicializo todo lo demás
         A1.checkLicense(this, licenseId, () -> {
             getLogger().info("Licencia válida ✓. Iniciando plugin...");
-
-            // 3a) Carga de idioma y prefijo
             loadLocale();
-
-            // 3b) Carga de ítems personalizados y lore con usos
             loadCustomItems();
-
-            // 3c) Carga de listas de bloqueo
             loadLists();
-
-            // 3d) Registro de listeners y comando
             Bukkit.getPluginManager().registerEvents(new ConsumibleListeners(this), this);
             Bukkit.getPluginManager().registerEvents(new RightClickListener(this), this);
             Bukkit.getPluginManager().registerEvents(new AttackListener(this), this);
-            this.getCommand("customitems").setExecutor(new CustomItemsCommand(this));
-
-            // 3e) Comprobación de actualizaciones
+            getCommand("customitems").setExecutor(new CustomItemsCommand(this));
             new UpdateChecker(this, "https://pastebin.com/raw/y3q4y5mD").checkForUpdates();
-
-            getLogger().info("§5[Customs-items] Plugin versión "
-                    + getDescription().getVersion()
-                    + " habilitado correctamente.");
+            getLogger().info("§5[Customs-items] Plugin versión " + getDescription().getVersion() + " habilitado correctamente.");
         });
     }
 
@@ -89,9 +71,6 @@ public class ItemActionsPlugin extends JavaPlugin {
         getLogger().info("§c[Customs-items] Plugin deshabilitado.");
     }
 
-    /**
-     * Lee o crea un archivo license.txt en la carpeta del plugin con un UUID persistente.
-     */
     private String loadOrCreateLicenseFile() throws IOException {
         File dataFolder = getDataFolder();
         if (!dataFolder.exists()) {
@@ -99,9 +78,9 @@ public class ItemActionsPlugin extends JavaPlugin {
         }
 
         Path licensePath = dataFolder.toPath().resolve("license.txt");
-        if (Files.notExists(licensePath)) {
+        if (Files.notExists(licensePath, new LinkOption[0])) {
             String uuid = UUID.randomUUID().toString();
-            Files.write(licensePath, uuid.getBytes());
+            Files.write(licensePath, uuid.getBytes(), new OpenOption[0]);
             getLogger().info("Generado nuevo license-id: " + uuid);
             return uuid;
         } else {
@@ -118,6 +97,7 @@ public class ItemActionsPlugin extends JavaPlugin {
         if (!langFile.exists()) {
             saveResource("locale/En-us.yml", false);
         }
+
         LangManager.loadLanguage(langFile, prefix);
     }
 
@@ -132,10 +112,7 @@ public class ItemActionsPlugin extends JavaPlugin {
 
         for (String key : getConfig().getConfigurationSection("items").getKeys(false)) {
             String path = "items." + key;
-
-            Material material = Material.getMaterial(
-                    getConfig().getString(path + ".material", "STONE").toUpperCase()
-            );
+            Material material = Material.getMaterial(getConfig().getString(path + ".material", "STONE").toUpperCase());
             if (material == null) {
                 getLogger().warning("Material inválido para el ítem " + key);
                 continue;
@@ -143,27 +120,28 @@ public class ItemActionsPlugin extends JavaPlugin {
 
             ItemStack item = new ItemStack(material);
             ItemMeta meta = item.getItemMeta();
+
             if (meta != null) {
                 String displayName = getConfig().getString(path + ".name");
                 if (displayName != null) {
-                    meta.setDisplayName(
-                            ChatColor.translateAlternateColorCodes('&', displayName)
-                    );
+                    if (displayName.contains("&#")) {
+                        meta.displayName(ColorUtil.toComponent(displayName));
+                    } else {
+                        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', displayName));
+                    }
                 }
 
                 List<String> loreConfig = getConfig().getStringList(path + ".lore");
                 if (!loreConfig.isEmpty()) {
                     int maxUses = getConfig().getInt(path + ".attack.uses", 0);
-                    List<String> lore = new ArrayList<>();
+                    List<Component> lore = new ArrayList<>();
+
                     for (String line : loreConfig) {
-                        String txt = line.replace(
-                                "%uses%", maxUses > 0 ? String.valueOf(maxUses) : "∞"
-                        );
-                        lore.add(
-                                ChatColor.translateAlternateColorCodes('&', txt)
-                        );
+                        String txt = line.replace("%uses%", maxUses > 0 ? String.valueOf(maxUses) : "∞");
+                        lore.add(ColorUtil.toComponent(txt));
                     }
-                    meta.setLore(lore);
+
+                    meta.lore(lore);
                 }
 
                 item.setItemMeta(meta);
@@ -201,8 +179,7 @@ public class ItemActionsPlugin extends JavaPlugin {
     public boolean isRegionBlockedGlobally(String region, String itemKey) {
         region = region.toLowerCase();
         itemKey = itemKey.toLowerCase();
-        return globalRegionBlacklist.contains(region)
-                && (!blockOnlyListedItems || itemBlacklist.contains(itemKey));
+        return globalRegionBlacklist.contains(region) && (!blockOnlyListedItems || itemBlacklist.contains(itemKey));
     }
 
     public boolean isRegionBlockedForItem(String itemKey, String region) {
