@@ -2,34 +2,28 @@ package edu.customs.items.listeners;
 
 import edu.customs.items.ItemActionsPlugin;
 import edu.customs.items.util.*;
-import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
 
 import java.util.*;
 
-public class AttackListener implements Listener {
+public class ConsumibleListeners implements Listener {
 
     private final ItemActionsPlugin plugin;
 
-    public AttackListener(ItemActionsPlugin plugin) {
+    public ConsumibleListeners(ItemActionsPlugin plugin) {
         this.plugin = plugin;
     }
 
     @EventHandler
-    public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
-        if (!(event.getDamager() instanceof Player)) return;
-        Player player = (Player) event.getDamager();
-        Entity target = event.getEntity();
-
-        ItemStack item = VersionUtils.getItemInHand(player);
+    public void onItemConsume(PlayerItemConsumeEvent event) {
+        Player player = event.getPlayer();
+        ItemStack item = event.getItem();
         if (item == null || !item.hasItemMeta()) return;
 
         ConfigurationSection itemsSection = plugin.getConfig().getConfigurationSection("items");
@@ -50,12 +44,11 @@ public class AttackListener implements Listener {
             ItemMeta meta = item.getItemMeta();
             if (meta == null || !meta.hasDisplayName()) continue;
 
-            String itemName = meta.getDisplayName();
+            String displayName = meta.getDisplayName();
 
-            // ✅ Comparación segura usando matchColorName de ColorUtil
-            if (!ColorUtil.matchColorName(nameConfig, itemName)) continue;
+            // ✅ Comparación segura usando ColorUtil
+            if (!ColorUtil.matchColorName(nameConfig, displayName)) continue;
 
-            // ⛔ Verificación de regiones
             List<String> itemRegionBlock = plugin.getConfig().getStringList(basePath + ".region-block");
 
             boolean canUse = WGUtils.canUseItem(player, player.getLocation(),
@@ -68,8 +61,8 @@ public class AttackListener implements Listener {
                 return;
             }
 
-            // ⏳ Manejo del cooldown
-            long cooldown = plugin.getConfig().getLong(basePath + ".attack.cooldown", 0);
+            // ⏳ Cooldown check
+            long cooldown = plugin.getConfig().getLong(basePath + ".consume.cooldown", 0);
             if (CooldownManager.hasCooldown(player, key)) {
                 long remaining = CooldownManager.getRemaining(player, key);
                 String prefix = plugin.getConfig().getString("Prefix", "&7[Items] ");
@@ -78,48 +71,38 @@ public class AttackListener implements Listener {
                 return;
             }
 
-            // ✅ Ejecutar comandos y mensajes
-            List<String> commands = plugin.getConfig().getStringList(basePath + ".attack.commands");
-            List<String> messages = plugin.getConfig().getStringList(basePath + ".attack.messages");
+            // ✅ Ejecutar acciones
+            List<String> commands = plugin.getConfig().getStringList(basePath + ".consume.commands");
+            List<String> messages = plugin.getConfig().getStringList(basePath + ".consume.messages");
 
-            commands = replaceVariables(commands, player.getName(), target.getName());
-            messages = replaceVariables(messages, player.getName(), target.getName());
+            commands = replaceVariables(commands, player.getName(), player.getName());
+            messages = replaceVariables(messages, player.getName(), player.getName());
 
-            ActionExecutor.run(plugin, player, target, commands, messages);
+            ActionExecutor.run(plugin, player, player, commands, messages);
 
+            // 🧊 Establecer cooldown
             if (cooldown > 0) {
                 CooldownManager.setCooldown(player, key, cooldown);
             }
 
-            // 🔁 Manejo de usos y reducción de cantidad
-            int maxUses = plugin.getConfig().getInt(basePath + ".attack.uses", 0);
-            int reduceAmount = plugin.getConfig().getInt(basePath + ".attack.reduce-amount", 0);
+            // ❌ Reducción de ítem
+            if (!ItemUtils.shouldReduce(plugin, key, "consume")) {
+                event.setCancelled(true); // No se debe consumir
+            } else {
+                int reduceAmount = plugin.getConfig().getInt(basePath + ".consume.reduce-amount", 1);
 
-            NamespacedKey usesKey = new NamespacedKey(plugin, "custom_uses");
-
-            if (maxUses > 0) {
-                int currentUses = meta.getPersistentDataContainer().getOrDefault(usesKey, PersistentDataType.INTEGER, maxUses);
-                int newUses = currentUses - 1;
-
-                if (newUses <= 0) {
-                    player.getInventory().setItemInMainHand(null);
-                } else {
-                    meta.getPersistentDataContainer().set(usesKey, PersistentDataType.INTEGER, newUses);
-                    item.setItemMeta(meta);
-                    player.getInventory().setItemInMainHand(item);
-                }
-
-            } else if (reduceAmount > 0) {
                 int newAmount = item.getAmount() - reduceAmount;
                 if (newAmount <= 0) {
-                    player.getInventory().setItemInMainHand(null);
+                    player.getInventory().removeItem(item);
+                    player.sendMessage(LangManager.get("item-consumed"));
                 } else {
                     item.setAmount(newAmount);
                     player.getInventory().setItemInMainHand(item);
+                    player.sendMessage(LangManager.get("item-partially-consumed"));
                 }
             }
 
-            break; // Ítem procesado
+            break; // ítem encontrado y procesado
         }
     }
 

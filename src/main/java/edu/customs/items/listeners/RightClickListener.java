@@ -37,10 +37,15 @@ public class RightClickListener implements Listener {
             String nameConfig = plugin.getConfig().getString(basePath + ".name");
             if (material == null || nameConfig == null) continue;
 
-            String configName = ColorUtil.format(nameConfig);
-
             if (!item.getType().name().equalsIgnoreCase(material)) continue;
-            if (!item.getItemMeta().getDisplayName().equals(configName)) continue;
+
+            ItemMeta meta = item.getItemMeta();
+            if (meta == null || !meta.hasDisplayName()) continue;
+
+            String displayName = meta.getDisplayName();
+
+            // ✅ Comparación segura usando ColorUtil
+            if (!ColorUtil.matchColorName(nameConfig, displayName)) continue;
 
             // Región bloqueada
             boolean canUse = WGUtils.canUseItem(
@@ -52,7 +57,7 @@ public class RightClickListener implements Listener {
             );
 
             if (!canUse) {
-                player.sendMessage(LangManager.get("blocked"));
+                player.sendMessage(ColorUtil.format(LangManager.get("blocked")));
                 event.setCancelled(true);
                 return;
             }
@@ -81,12 +86,11 @@ public class RightClickListener implements Listener {
                 CooldownManager.setCooldown(player, key, cooldown);
             }
 
-            // Usos o cantidad
+            // 🧪 Usos o cantidad
             int maxUses = plugin.getConfig().getInt(basePath + ".right-click.uses", 0);
             int reduceAmount = plugin.getConfig().getInt(basePath + ".right-click.reduce-amount", 0);
 
             if (maxUses > 0) {
-                ItemMeta meta = item.getItemMeta();
                 if (meta == null) break;
 
                 List<String> lore = meta.getLore();
