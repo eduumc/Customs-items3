@@ -79,5 +79,17 @@ items:
       messages:
         - "&a¡Te curaste con la poción!"
       reduce-amount: 1
+  espada_legendaria:
+    material: DIAMOND_SWORD
+    reduce-ammount: 1
+    cooldown: 5
+    Expiration_time:
+      duration: 5m
+      slots:
+        - hand
+        - offhand
+      triggers:
+        - onAttack
+        - onHold
     region-block:
       - pvp_zone
