@@ -1,9 +1,13 @@
 package edu.customs.items;
 
+import edu.customs.items.expiration.ExpirationHandler;
+import edu.customs.items.expiration.ExpirationSettings;
 import edu.customs.items.listeners.AttackListener;
 import edu.customs.items.listeners.ConsumibleListeners;
+import edu.customs.items.listeners.ExpirationListeners;
 import edu.customs.items.listeners.RightClickListener;
 import edu.customs.items.us.com.java.edu.nolook.any.A1;
+import edu.customs.items.util.AdventureUtil;
 import edu.customs.items.util.ColorUtil;
 import edu.customs.items.util.LangManager;
 import edu.customs.items.util.UpdateChecker;
@@ -11,17 +15,16 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
-import java.nio.file.OpenOption;
-import java.nio.file.Path;
+import java.nio.file.*;
 import java.util.*;
 
 public class ItemActionsPlugin extends JavaPlugin {
@@ -57,18 +60,24 @@ public class ItemActionsPlugin extends JavaPlugin {
             loadLocale();
             loadCustomItems();
             loadLists();
+
             Bukkit.getPluginManager().registerEvents(new ConsumibleListeners(this), this);
             Bukkit.getPluginManager().registerEvents(new RightClickListener(this), this);
             Bukkit.getPluginManager().registerEvents(new AttackListener(this), this);
+            Bukkit.getPluginManager().registerEvents(new ExpirationListeners(), this);
+
             getCommand("customitems").setExecutor(new CustomItemsCommand(this));
+
             new UpdateChecker(this, "https://pastebin.com/raw/y3q4y5mD").checkForUpdates();
             getLogger().info("§5[Customs-items] Plugin versión " + getDescription().getVersion() + " habilitado correctamente.");
+
+            ExpirationHandler.startTask(this);
         });
     }
 
     @Override
     public void onDisable() {
-        getLogger().info("§c[Customs-items] Plugin deshabilitado.");
+        getLogger().info("\u00a5c[Customs-items] Plugin deshabilitado.");
     }
 
     private String loadOrCreateLicenseFile() throws IOException {
@@ -78,9 +87,9 @@ public class ItemActionsPlugin extends JavaPlugin {
         }
 
         Path licensePath = dataFolder.toPath().resolve("license.txt");
-        if (Files.notExists(licensePath, new LinkOption[0])) {
+        if (Files.notExists(licensePath)) {
             String uuid = UUID.randomUUID().toString();
-            Files.write(licensePath, uuid.getBytes(), new OpenOption[0]);
+            Files.write(licensePath, uuid.getBytes());
             getLogger().info("Generado nuevo license-id: " + uuid);
             return uuid;
         } else {
@@ -123,25 +132,32 @@ public class ItemActionsPlugin extends JavaPlugin {
 
             if (meta != null) {
                 String displayName = getConfig().getString(path + ".name");
+                List<String> loreConfig = getConfig().getStringList(path + ".lore");
+                int maxUses = getConfig().getInt(path + ".attack.uses", 0);
+
                 if (displayName != null) {
-                    if (displayName.contains("&#")) {
-                        meta.displayName(ColorUtil.toComponent(displayName));
+                    if (displayName.contains("&#") || displayName.contains("<")) {
+                        AdventureUtil.setDisplayName(meta, ColorUtil.toComponent(displayName));
                     } else {
                         meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', displayName));
                     }
                 }
 
-                List<String> loreConfig = getConfig().getStringList(path + ".lore");
                 if (!loreConfig.isEmpty()) {
-                    int maxUses = getConfig().getInt(path + ".attack.uses", 0);
-                    List<Component> lore = new ArrayList<>();
-
+                    List<String> processed = new ArrayList<>();
                     for (String line : loreConfig) {
-                        String txt = line.replace("%uses%", maxUses > 0 ? String.valueOf(maxUses) : "∞");
-                        lore.add(ColorUtil.toComponent(txt));
+                        processed.add(line.replace("%uses%", maxUses > 0 ? String.valueOf(maxUses) : "∞"));
                     }
 
-                    meta.lore(lore);
+                    if (processed.stream().anyMatch(s -> s.contains("&#") || s.contains("<"))) {
+                        List<Component> lore = processed.stream().map(ColorUtil::toComponent).toList();
+                        AdventureUtil.setLore(meta, lore);
+                    } else {
+                        List<String> lore = processed.stream()
+                                .map(s -> ChatColor.translateAlternateColorCodes('&', s))
+                                .toList();
+                        meta.setLore(lore);
+                    }
                 }
 
                 item.setItemMeta(meta);
@@ -149,17 +165,26 @@ public class ItemActionsPlugin extends JavaPlugin {
 
             customItems.put(key.toLowerCase(), item);
 
+            if (getConfig().isConfigurationSection(path + ".Expiration_time")) {
+                ConfigurationSection expirationSection = getConfig().getConfigurationSection(path + ".Expiration_time");
+                ExpirationSettings settings = new ExpirationSettings(expirationSection);
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    if (player.getInventory().contains(item)) {
+                        ExpirationHandler.trackItem(player, item, settings);
+                    }
+                }
+            }
+
             List<String> regionBlockList = getConfig().getStringList(path + ".region-block");
             if (!regionBlockList.isEmpty()) {
-                List<String> lowerRegions = new ArrayList<>();
-                for (String region : regionBlockList) {
-                    lowerRegions.add(region.toLowerCase());
-                }
+                List<String> lowerRegions = regionBlockList.stream()
+                        .map(String::toLowerCase)
+                        .toList();
                 customItemRegionBlocks.put(key.toLowerCase(), lowerRegions);
             }
         }
 
-        getLogger().info("§5[Customs-items] Ítems personalizados cargados: " + customItems.keySet());
+        getLogger().info("\u00a75[Customs-items] Ítems personalizados cargados: " + customItems.keySet());
     }
 
     public void loadLists() {
@@ -167,13 +192,13 @@ public class ItemActionsPlugin extends JavaPlugin {
         for (String region : getConfig().getStringList("region-blacklist")) {
             globalRegionBlacklist.add(region.toLowerCase());
         }
-        getLogger().info("§5[Customs-items] Regiones bloqueadas globalmente: " + globalRegionBlacklist);
+        getLogger().info("\u00a75[Customs-items] Regiones bloqueadas globalmente: " + globalRegionBlacklist);
 
         itemBlacklist.clear();
         for (String item : getConfig().getStringList("item-blacklist")) {
             itemBlacklist.add(item.toLowerCase());
         }
-        getLogger().info("§5[Customs-items] Ítems bloqueados globalmente: " + itemBlacklist);
+        getLogger().info("\u00a75[Customs-items] Ítems bloqueados globalmente: " + itemBlacklist);
     }
 
     public boolean isRegionBlockedGlobally(String region, String itemKey) {

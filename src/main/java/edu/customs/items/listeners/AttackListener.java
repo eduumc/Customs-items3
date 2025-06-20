@@ -13,6 +13,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class AttackListener implements Listener {
@@ -40,20 +41,23 @@ public class AttackListener implements Listener {
             String configName = plugin.getConfig().getString(basePath + ".name");
 
             if (material == null || configName == null) continue;
-
             if (!item.getType().name().equalsIgnoreCase(material)) continue;
 
             ItemMeta meta = item.getItemMeta();
             if (meta == null || !meta.hasDisplayName()) continue;
-
             if (!ColorUtil.matchColorName(configName, meta.getDisplayName())) continue;
 
-            // Check WorldGuard regions or blacklists
+            // ✅ WorldGuard region check
             List<String> itemRegionBlock = plugin.getConfig().getStringList(basePath + ".region-block");
-            boolean canUse = WGUtils.canUseItem(player, player.getLocation(),
-                    plugin.getGlobalRegionBlacklist().stream().toList(),
-                    plugin.getItemBlacklist().stream().toList(),
-                    key, material, itemRegionBlock);
+            boolean canUse = WGUtils.canUseItem(
+                    player,
+                    player.getLocation(),
+                    new ArrayList<>(plugin.getGlobalRegionBlacklist()),
+                    new ArrayList<>(plugin.getItemBlacklist()),
+                    key,
+                    material,
+                    itemRegionBlock
+            );
 
             if (!canUse) {
                 player.sendMessage(ColorUtil.format(LangManager.get("blocked")));
@@ -61,7 +65,7 @@ public class AttackListener implements Listener {
                 return;
             }
 
-            // Cooldown
+            // ⏱️ Cooldown
             long cooldown = plugin.getConfig().getLong(basePath + ".attack.cooldown", 0L);
             if (CooldownManager.hasCooldown(player, key)) {
                 long remaining = CooldownManager.getRemaining(player, key);
@@ -71,19 +75,21 @@ public class AttackListener implements Listener {
                 return;
             }
 
-            // Ejecutar acciones
+            // ⚡ Ejecutar acciones
             List<String> commands = plugin.getConfig().getStringList(basePath + ".attack.commands");
             List<String> messages = plugin.getConfig().getStringList(basePath + ".attack.messages");
 
-            ActionExecutor.run(plugin, player, target,
+            ActionExecutor.run(
+                    plugin, player, target,
                     replaceVars(commands, player.getName(), target.getName()),
-                    replaceVars(messages, player.getName(), target.getName()));
+                    replaceVars(messages, player.getName(), target.getName())
+            );
 
             if (cooldown > 0L) {
                 CooldownManager.setCooldown(player, key, cooldown);
             }
 
-            // Uso o reducción de cantidad
+            // 🧪 Usos o reducción de cantidad
             int maxUses = plugin.getConfig().getInt(basePath + ".attack.uses", 0);
             int reduceAmount = plugin.getConfig().getInt(basePath + ".attack.reduce-amount", 0);
             NamespacedKey usesKey = new NamespacedKey(plugin, "custom_uses");
@@ -97,7 +103,6 @@ public class AttackListener implements Listener {
                 } else {
                     meta.getPersistentDataContainer().set(usesKey, PersistentDataType.INTEGER, newUses);
                     item.setItemMeta(meta);
-                    player.getInventory().setItemInMainHand(item);
                 }
 
             } else if (reduceAmount > 0) {
@@ -106,11 +111,11 @@ public class AttackListener implements Listener {
                     player.getInventory().setItemInMainHand(null);
                 } else {
                     item.setAmount(newAmount);
-                    player.getInventory().setItemInMainHand(item);
                 }
             }
 
-            break; // Salimos del bucle porque ya se encontró el ítem
+            player.getInventory().setItemInMainHand(item);
+            break; // Ya procesado
         }
     }
 

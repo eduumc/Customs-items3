@@ -35,6 +35,10 @@
             <releases><enabled>true</enabled></releases>
             <snapshots><enabled>false</enabled></snapshots>
         </repository>
+        <repository>
+            <id>sonatype</id>
+            <url>https://oss.sonatype.org/content/groups/public/</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -101,7 +105,7 @@
         <dependency>
             <groupId>com.google.apis</groupId>
             <artifactId>google-api-services-sheets</artifactId>
-            <version>v4-rev20240514-2.0.0</version> <!-- disponible en Maven Central :contentReference[oaicite:1]{index=1} -->
+            <version>v4-rev20240514-2.0.0</version>
         </dependency>
 
         <!-- Jackson (opcional) -->
@@ -163,13 +167,20 @@
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
-                                        <Main-Class>edu.customs.items.CustomItems</Main-Class>
+                                        <Main-Class>edu.customs.items.ItemActionsPlugin</Main-Class> <!-- Corregido -->
                                     </manifestEntries>
                                 </transformer>
                             </transformers>
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+
+            <!-- Plugin útil adicional -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
             </plugin>
         </plugins>
     </build>
